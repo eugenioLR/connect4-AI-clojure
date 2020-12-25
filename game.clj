@@ -1,6 +1,7 @@
 (ns game)
 
 (require '[clojure.test :refer :all])
+(require '[clojure.core.reducers :as r])
 
 ;======= CODE =========
 (def SLOT-AMOUNT 4)
@@ -16,6 +17,14 @@
             (>= j height) board
             (>= i width) (empty-board height width 0 (+ j 1) (conj board row) (vector))
             :else (empty-board height width (+ i 1) j board (conj row {:player 0 :filled false})))))
+
+(defn gen-legal-moves [board]
+    (for [x (range (count (get board 0)))
+          :when (not (get (get (get board 0) x) :filled))]
+        x))
+
+(defn board-full? [board]
+    (reduce #(and %1 %2) (for [i board] (reduce #(and %1 (get %2 :filled)) true i))))
 
 (defn insert-piece
     ([board player x]
@@ -76,6 +85,41 @@
     (is (= (count (first board)) 7))
     (is (= (get (first (first board)) :player) 0))
     (is (not (get (first (first board)) :filled))))
+
+(deftest legal-moves-tests
+    (def A {:player game/PLAYER-1 :filled true})
+    (def B {:player game/PLAYER-2 :filled true})
+    (def N {:player 0 :filled false})
+    (def test-board-0 (game/empty-board 6 7))
+    (def test-board-1 [[A N N A N B N]
+                       [A N B A N B A]
+                       [B A B A N B A]
+                       [B A A A N A B]
+                       [A B A B N B A]
+                       [A B A B N A A]])
+    (is (= (gen-legal-moves test-board-0) (range 7)))
+    (is (= (gen-legal-moves test-board-1) '(1 2 4 6))))
+
+(deftest board-full-tests
+    (def A {:player PLAYER-1 :filled true})
+    (def B {:player PLAYER-2 :filled true})
+    (def N {:player 0 :filled false})
+    (def test-board-1 (empty-board 6 7))
+    (def test-board-2 [[A A A A A A A]
+                       [A A A A A A A]
+                       [A A A A A A A]
+                       [A A A A A A A]
+                       [A A A A A A A]
+                       [A A A A A A A]])
+    (def test-board-3 [[A A A A A A A]
+                       [A A A A A N A]
+                       [A A A A A A A]
+                       [A A A A A A A]
+                       [A A A A A A A]
+                       [A A A A A A A]])
+    (is (not (board-full? test-board-1)))
+    (is (board-full? test-board-2))
+    (is (not (board-full? test-board-3))))
 
 (deftest piece-insertion-test
     (def A {:player PLAYER-1 :filled true})
@@ -145,6 +189,9 @@
     (is (not (inv-diag-line-check test-board-3 PLAYER-2 (list 2 2)))))
 
 (deftest win-condition-test
+    (def A {:player PLAYER-1 :filled true})
+    (def B {:player PLAYER-2 :filled true})
+    (def N {:player 0 :filled false})
     (def test-board-1 [[N N N N N N]
                        [N N N N N N]
                        [A N N N A N]

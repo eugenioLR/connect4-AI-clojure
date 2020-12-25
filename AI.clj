@@ -1,11 +1,5 @@
 (ns AI (:require [game :as game]))
 (require '[clojure.test :refer :all])
-(require '[clojure.core.reducers :as r])
-
-(defn gen-legal-moves [board]
-    (for [x (range (count (get board 0)))
-          :when (not (get (get (get board 0) x) :filled))]
-        x))
 
 (defn column-top
     ([board column]
@@ -98,15 +92,16 @@
         (let
             [new-depth (if (= player first-player) (+ depth 1) depth)
              new-player (bit-xor player 1)]
-            (if (< depth max-depth)
+            (if (and (< depth max-depth)
+                     (not (game/game-ended? board player (list (column-top board last-move) last-move))))
                 (cons {:score 0 :move last-move}
-                      (for [i (gen-legal-moves board)]
+                      (for [i (game/gen-legal-moves board)]
                            (gen-minimax (game/insert-piece board new-player i) new-player max-depth i first-player new-depth)))
                 {:score (get-score board player first-player last-move) :move last-move}))))
 
 
 (defn get-minimax-move
-    ([tree player] (get-minimax-move tree player player))
+    ([tree player] (get-minimax-move tree (bit-xor player 1) player))
     ([tree player first-player]
         (let [min-or-max (if (= player first-player) max min)
               new-player (bit-xor player 1)
@@ -116,24 +111,10 @@
                  (apply max-or-min #(get % :score) (for [i (rest tree)]
                                                         (get-minimax-move i new-player first-player)))))))
 
-(defn connect4-AI [board player level last-move] (get-minimax-move (gen-minimax board player level last-move) player (bit-xor player 1)))
-
+(defn connect4-AI-move [board player last-move level] (get (get-minimax-move (gen-minimax board player level last-move) player) :move))
+(defn random-move [board & not-used] (rand-nth (game/gen-legal-moves board)))
 
 ;======= TESTS =========
-(deftest legal-moves-tests
-    (def A {:player game/PLAYER-1 :filled true})
-    (def B {:player game/PLAYER-2 :filled true})
-    (def N {:player 0 :filled false})
-    (def test-board-0 (game/empty-board 6 7))
-    (def test-board-1 [[A N N A N B N]
-                       [A N B A N B A]
-                       [B A B A N B A]
-                       [B A A A N A B]
-                       [A B A B N B A]
-                       [A B A B N A A]])
-    (is (= (gen-legal-moves test-board-0) (range 7)))
-    (is (= (gen-legal-moves test-board-1) '(1 2 4 6))))
-
 (deftest column-top-tests
     (def A {:player game/PLAYER-1 :filled true})
     (def B {:player game/PLAYER-2 :filled true})
@@ -218,4 +199,4 @@
     (is (= (get-score test-board-3 0 0 0) Integer/MAX_VALUE))
     (is (= (get-score test-board-4 1 5 0) Integer/MIN_VALUE)))
 
-(run-tests)
+;(run-tests)
