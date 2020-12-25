@@ -1,4 +1,4 @@
-(ns connect4AI.game)
+(ns game)
 
 (require '[clojure.test :refer :all])
 
@@ -9,48 +9,60 @@
 
 ; slot {:player :filled}
 (defn empty-board
-    ([height width] (empty-board height width 0 0 (vector) (vector)))
-    ([height width i j board row] (cond
-                            (>= j height) board
-                            (>= i width) (empty-board height width 0 (+ j 1) (conj board row) (vector))
-                            :else (empty-board height width (+ i 1) j board (conj row {:player 0 :filled false})))))
+    ([height width]
+        (empty-board height width 0 0 (vector) (vector)))
+    ([height width i j board row]
+        (cond
+            (>= j height) board
+            (>= i width) (empty-board height width 0 (+ j 1) (conj board row) (vector))
+            :else (empty-board height width (+ i 1) j board (conj row {:player 0 :filled false})))))
 
 (defn insert-piece
-    ([board player x] (insert-piece board player x 0))
-    ([board player x y] (cond
-                            (get (get (get board y) x) :filled) board
-                            (or (>= (+ y 1) (count board))
-                                (get (get (get board (+ y 1)) x) :filled))
-                                (assoc board y (assoc (get board y) x {:player player :filled true}))
-                            :else (insert-piece board player x (+ y 1)))))
+    ([board player x]
+        (insert-piece board player x 0))
+    ([board player x y]
+        (cond
+            (get (get (get board y) x) :filled) board
+            (or (>= (+ y 1) (count board))
+                (get (get (get board (+ y 1)) x) :filled))
+                (assoc board y (assoc (get board y) x {:player player :filled true}))
+            :else (insert-piece board player x (+ y 1)))))
 
-(defn setup-check [board player coord dir rev]
-    (let [next (dir coord) y (first next) x (last next)]
+;move cursor to the start of a potencial line
+(defn setup-check [board player coord step rev]
+    (let [next (step coord) y (first next) x (last next)]
         (if (and (= (get (get (get board y) x) :player) player)
                  (get (get (get board y) x) :filled))
-            (setup-check board player next dir rev)
+            (setup-check board player next step rev)
             (rev coord))))
 
+;start from the start of the potencial line and go step by step
+;until either you reach the end or you get 4 in a row
 (defn line-check
-    ([board player coord step reverse] (line-check board player (setup-check board player coord reverse step) step reverse 1))
-    ([board player coord step reverse count] (let [y (first coord) x (last coord)]
-                                                (cond
-                                                    (>= count SLOT-AMOUNT) true
-                                                    (and (get (get (get board y) x) :filled)
-                                                         (= (get (get (get board y) x) :player) player))
-                                                         (line-check board player (step coord) step reverse (+ count 1))
-                                                    :else false))))
+    ([board player coord step reverse]
+        (line-check board player (setup-check board player coord reverse step) step reverse 1))
+    ([board player coord step reverse count]
+        (let [y (first coord) x (last coord)]
+            (cond
+                (>= count SLOT-AMOUNT) true
+                (and (get (get (get board y) x) :filled)
+                     (= (get (get (get board y) x) :player) player))
+                     (line-check board player (step coord) step reverse (+ count 1))
+                :else false))))
 
+;step functions
 (defn step-up [coord] (list (- (first coord) 1) (last coord)))
 (defn step-down [coord] (list (+ (first coord) 1) (last coord)))
 (defn step-left [coord] (list (first coord) (- (last coord) 1)))
 (defn step-right [coord] (list (first coord) (+ (last coord) 1)))
 
+;line checking shorthand expressions
 (defn vert-line-check [board player coord] (line-check board player coord step-up step-down))
 (defn horiz-line-check [board player coord] (line-check board player coord step-left step-right))
 (defn diag-line-check [board player coord] (line-check board player coord #(step-up (step-left %)) #(step-down (step-right %))))
 (defn inv-diag-line-check [board player coord] (line-check board player coord #(step-up (step-right %)) #(step-down (step-left %))))
 
+;checks if the player has completed any line
 (defn game-ended? [board player coord]
     (or (vert-line-check board player coord)
         (horiz-line-check board player coord)
@@ -153,4 +165,4 @@
     (is (not (game-ended? test-board-2 PLAYER-1 '(5 1))))
     (is (not (game-ended? test-board-2 PLAYER-1 '(5 0)))))
 
-(run-tests)
+;(run-tests)
