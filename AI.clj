@@ -6,6 +6,30 @@
           :when (not (get (get (get board 0) x) :filled))]
         x))
 
+(defn column-top
+    ([board column] (column-top board column 0))
+    ([board column i] (if (get (get (get board i) column) :filled)
+                          i
+                          (column-top board column (+ i 1)))))
+
+(defn get-score [board player first-player last-move]
+    (if (game/game-ended? board player (column-top board) last-move)
+        (if (= player first-player)
+            Integer/MAX_VALUE
+            Integer/MIN_VALUE)
+        (reduce + (for [i (count board) j (count (get board 0))])))
+
+(defn gen-minimax
+    ([board player max-depth last-move] (gen-minimax board player max-depth 0 0 (list) last-move))
+    ([board player max-depth last-move first-player depth]
+        (let
+            [new-depth (if (= player first-player) (+ depth 1) depth)]
+            [new-player (bit-xor player 1)]
+            (if (< depth max-depth)
+                (list (list 0 board) (for [i (gen-legal-moves board)]
+                                        (gen-minmax (game/insert-piece board player i) new-player max-depth i first-player new-depth)))
+                (list (get-score board player last-move) board))
+
 
 
 ;======= TESTS =========
