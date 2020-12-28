@@ -5,7 +5,7 @@
     ([board column]
         (column-top board column 0))
     ([board column i]
-        (if (or (get (get (get board i) column) :filled)
+        (if (or (not= (get (get board i) column) -1)
                 (>= i (count board)))
             i
             (column-top board column (+ i 1)))))
@@ -27,28 +27,23 @@
     ([board player coord step reverse possible placed total]
         (let [y (first coord)
               x (last coord)
-              new-possible (cond
-                             (or (= (get (get (get board y) x) :player) player)
-                                 (not (get (get (get board y) x) :filled)))
-                                 (+ possible 1)
-                             (not= (get (get (get board y) x) :player) player)
-                                  0
-                             :else possible)
+              oponent (bit-xor player 1)
+              new-possible (if (not= (get (get board y) x) oponent)
+                               (+ possible 1)
+                               0)
               new-placed (cond
-                            (and (= (get (get (get board y) x) :player) player)
-                                 (get (get (get board y) x) :filled))
-                                 (+ placed 1)
-                            (get (get (get board y) x) :filled)
-                                 0
+                            (= (get (get board y) x) player)
+                               (+ placed 1)
+                            (= (get (get board y) x) oponent)
+                               0
                             :else placed)
-              new-total (if (and (not= (get (get (get board y) x) :player) player)
-                                 (get (get (get board y) x) :filled)
-                                 (>= possible game/SLOT-AMOUNT))
+              new-total (if (and (>= possible game/SLOT-AMOUNT)
+                                 (= (get (get board y) x) oponent))
                             (+ total placed)
                             total)]
              (if (and (>= y 0) (< y (count board)) (>= x 0) (< x (count (get board 0))))
                  (line-score board player (step coord) step reverse new-possible new-placed new-total)
-                  (if (>= possible game/SLOT-AMOUNT)
+                 (if (>= possible game/SLOT-AMOUNT)
                       (+ total placed)
                       total)))))
 
@@ -64,22 +59,18 @@
     [board player last-move first-player]
         (let [oponent (bit-xor player 1)]
             (if (game/game-ended? board player (list (column-top board last-move) last-move))
-                (if (= player first-player)
-                    Integer/MAX_VALUE
-                    Integer/MIN_VALUE)
+                Integer/MAX_VALUE
                 (-
                     (reduce + (for [i (range (count board))
                                     j (range (count (get board 0)))
-                                    :when (and (= (get (get (get board i) j) :player) player)
-                                               (get (get (get board i) j) :filled))]
+                                    :when (= (get (get board i) j) player)]
                                    (+ (vert-line-score board player (list i j))
                                       (horiz-line-score board player (list i j))
                                       (diag-line-score board player (list i j))
                                       (inv-diag-line-score board player (list i j)))))
                     (reduce + (for [i (range (count board))
                                     j (range (count (get board 0)))
-                                    :when (and (= (get (get (get board i) j) :player) oponent)
-                                               (get (get (get board i) j) :filled))]
+                                    :when (= (get (get board i) j) oponent)]
                                     (+ (vert-line-score board oponent (list i j))
                                        (horiz-line-score board oponent (list i j))
                                        (diag-line-score board oponent (list i j))
@@ -89,36 +80,35 @@
     ([board player max-depth last-move]
         (gen-minimax board player max-depth last-move player 0))
     ([board player max-depth last-move first-player depth]
-        (let
-            [new-depth (if (= player first-player) (+ depth 1) depth)
-             new-player (bit-xor player 1)]
+        (let [new-player (bit-xor player 1)]
             (if (and (< depth max-depth)
                      (not (game/game-ended? board player (list (column-top board last-move) last-move))))
                 (cons {:score 0 :move last-move}
                       (for [i (game/gen-legal-moves board)]
-                           (gen-minimax (game/insert-piece board new-player i) new-player max-depth i first-player new-depth)))
+                           (gen-minimax (game/insert-piece board new-player i) new-player max-depth i first-player (+ depth 1))))
                 {:score (get-score board player first-player last-move) :move last-move}))))
 
 
 (defn get-minimax-move
     ([tree player] (get-minimax-move tree (bit-xor player 1) player))
     ([tree player first-player]
-        (let [min-or-max (if (= player first-player) max min)
-              new-player (bit-xor player 1)
+        (let [new-player (bit-xor player 1)
               max-or-min (if (= player first-player) min-key max-key)]
              (if (get tree :score) ;if it's a leaf node
                  tree
-                 (apply max-or-min #(get % :score) (for [i (rest tree)]
-                                                        (get-minimax-move i new-player first-player)))))))
+                 (if (empty? (rest tree))
+                     (first tree)
+                     (apply max-or-min #(get % :score) (for [i (rest tree)]
+                                                            (get-minimax-move i new-player first-player))))))))
 
 (defn connect4-AI-move [board player last-move level] (get (get-minimax-move (gen-minimax board player level last-move) player) :move))
 (defn random-move [board & not-used] (rand-nth (game/gen-legal-moves board)))
 
 ;======= TESTS =========
 (deftest column-top-tests
-    (def A {:player game/PLAYER-1 :filled true})
-    (def B {:player game/PLAYER-2 :filled true})
-    (def N {:player 0 :filled false})
+    (def A 0)
+    (def B 1)
+    (def N -1)
     (def test-board [[A N N A N B N]
                      [A N B A N B A]
                      [B A B A N B A]
@@ -146,9 +136,9 @@
     (is (= (setup-line-score test-board '(5 5) #(game/step-up (game/step-left %)) #(game/step-down (game/step-right %))) '(0 0))))
 
 (deftest line-score-tests
-    (def A {:player game/PLAYER-1 :filled true})
-    (def B {:player game/PLAYER-2 :filled true})
-    (def N {:player 0 :filled false})
+    (def A 0)
+    (def B 1)
+    (def N -1)
     (def test-board-1 [[N N N N N N N]
                        [N N N N N N N]
                        [N N N N N N N]
@@ -167,9 +157,9 @@
     (is (= (line-score test-board-2 0 '(5 0) game/step-up game/step-down) 3)))
 
 (deftest board-score-tests
-    (def A {:player game/PLAYER-1 :filled true})
-    (def B {:player game/PLAYER-2 :filled true})
-    (def N {:player 0 :filled false})
+    (def A 0)
+    (def B 1)
+    (def N -1)
     (def test-board-1 [[N N N N N N N]
                        [N N N N N N N]
                        [N N N N N N N]

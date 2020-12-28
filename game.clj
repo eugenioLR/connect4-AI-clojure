@@ -8,7 +8,7 @@
 (def PLAYER-1 0)
 (def PLAYER-2 1)
 
-; slot {:player :filled}
+; slot {-1, 0, 1}
 (defn empty-board
     ([height width]
         (empty-board height width 0 0 (vector) (vector)))
@@ -16,32 +16,31 @@
         (cond
             (>= j height) board
             (>= i width) (empty-board height width 0 (+ j 1) (conj board row) (vector))
-            :else (empty-board height width (+ i 1) j board (conj row {:player 0 :filled false})))))
+            :else (empty-board height width (+ i 1) j board (conj row -1)))))
 
 (defn gen-legal-moves [board]
     (for [x (range (count (get board 0)))
-          :when (not (get (get (get board 0) x) :filled))]
+          :when (= (get (get board 0) x) -1)]
         x))
 
 (defn board-full? [board]
-    (reduce #(and %1 %2) (for [i board] (reduce #(and %1 (get %2 :filled)) true i))))
+    (reduce #(and %1 %2) (for [i board] (reduce #(and %1 (not= %2 -1)) true i))))
 
 (defn insert-piece
     ([board player x]
         (insert-piece board player x 0))
     ([board player x y]
         (cond
-            (get (get (get board y) x) :filled) board
+            (not= (get (get board y) x) -1) board
             (or (>= (+ y 1) (count board))
-                (get (get (get board (+ y 1)) x) :filled))
-                (assoc board y (assoc (get board y) x {:player player :filled true}))
+                (not= (get (get board (+ y 1)) x) -1))
+                (assoc board y (assoc (get board y) x player))
             :else (insert-piece board player x (+ y 1)))))
 
 ;move cursor to the start of a potencial line
 (defn setup-check [board player coord step rev]
     (let [next (step coord) y (first next) x (last next)]
-        (if (and (= (get (get (get board y) x) :player) player)
-                 (get (get (get board y) x) :filled))
+        (if (= (get (get board y) x) player)
             (setup-check board player next step rev)
             (rev coord))))
 
@@ -54,9 +53,8 @@
         (let [y (first coord) x (last coord)]
             (cond
                 (>= count SLOT-AMOUNT) true
-                (and (get (get (get board y) x) :filled)
-                     (= (get (get (get board y) x) :player) player))
-                     (line-check board player (step coord) step reverse (+ count 1))
+                (= (get (get board y) x) player)
+                   (line-check board player (step coord) step reverse (+ count 1))
                 :else false))))
 
 ;step functions
@@ -83,13 +81,13 @@
     (def board (empty-board 6 7))
     (is (= (count board) 6))
     (is (= (count (first board)) 7))
-    (is (= (get (first (first board)) :player) 0))
-    (is (not (get (first (first board)) :filled))))
+    (is (= (first (first board)) -1))
+    (is (= (first (first board)) -1)))
 
 (deftest legal-moves-tests
-    (def A {:player game/PLAYER-1 :filled true})
-    (def B {:player game/PLAYER-2 :filled true})
-    (def N {:player 0 :filled false})
+    (def A 0)
+    (def B 1)
+    (def N -1)
     (def test-board-0 (game/empty-board 6 7))
     (def test-board-1 [[A N N A N B N]
                        [A N B A N B A]
@@ -101,9 +99,9 @@
     (is (= (gen-legal-moves test-board-1) '(1 2 4 6))))
 
 (deftest board-full-tests
-    (def A {:player PLAYER-1 :filled true})
-    (def B {:player PLAYER-2 :filled true})
-    (def N {:player 0 :filled false})
+    (def A 0)
+    (def B 1)
+    (def N -1)
     (def test-board-1 (empty-board 6 7))
     (def test-board-2 [[A A A A A A A]
                        [A A A A A A A]
@@ -122,9 +120,9 @@
     (is (not (board-full? test-board-3))))
 
 (deftest piece-insertion-test
-    (def A {:player PLAYER-1 :filled true})
-    (def B {:player PLAYER-2 :filled true})
-    (def N {:player 0 :filled false})
+    (def A 0)
+    (def B 1)
+    (def N -1)
     (def test-board-0 (empty-board 6 7))
     (def test-board-1 [[N N N N N N]
                        [N N N N N N]
@@ -138,15 +136,15 @@
                        [B B N N N N]
                        [A B A N N N]
                        [A A B A N N]])
-    (is (get (get (get (insert-piece test-board-0 0 0) 5) 0) :filled))
-    (is (= (get (get (get (insert-piece test-board-0 1 0) 5) 0) :player) 1))
-    (is (get (get (get (insert-piece test-board-1 2 0) 3) 0) :filled))
+    (is (not= (get (get (insert-piece test-board-0 0 0) 5) 0) -1))
+    (is (= (get (get (insert-piece test-board-0 1 0) 5) 0) 1))
+    (is (not= (get (get (insert-piece test-board-1 2 0) 3) 0) -1))
     (is (insert-piece test-board-2 0 0)))
 
 (deftest line-checking-test
-    (def A {:player PLAYER-1 :filled true})
-    (def B {:player PLAYER-2 :filled true})
-    (def N {:player 0 :filled false})
+    (def A 0)
+    (def B 1)
+    (def N -1)
     (def test-board-1 [[N N N N N N]
                        [N N N N N N]
                        [A N N N A N]
@@ -189,9 +187,9 @@
     (is (not (inv-diag-line-check test-board-3 PLAYER-2 (list 2 2)))))
 
 (deftest win-condition-test
-    (def A {:player PLAYER-1 :filled true})
-    (def B {:player PLAYER-2 :filled true})
-    (def N {:player 0 :filled false})
+    (def A 0)
+    (def B 1)
+    (def N -1)
     (def test-board-1 [[N N N N N N]
                        [N N N N N N]
                        [A N N N A N]
