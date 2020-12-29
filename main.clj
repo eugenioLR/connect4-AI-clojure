@@ -24,15 +24,6 @@
                 (println "]")
                 (display-board (rest board)))))
 
-
-;(define (display-matrix mat)
-;  (when (not (empty? mat))
-;    (begin
-;      (map display (list "(" (car (car mat))))
-;      (map (lambda (x) (map display (list " " x))) (cdr (car mat)))
-;      (display ")\n")
-;      (display-matrix (cdr mat)))))
-
 (defn connect4-game
     ([player-1 player-2 print-mode]
         (let [board (game/empty-board 6 7)]
@@ -46,19 +37,20 @@
               move (if (empty? move-list)
                        (player board turn 0)
                        (player board turn (first move-list)))
-              new-board (game/insert-piece board turn move)]
+              new-board (game/insert-piece board turn move)
+              new-move-list (conj move-list move)]
              (cond
-                 (game/game-ended? new-board turn (list (ai/column-top new-board move) move)) {:winner turn :moves move-list :board new-board}
-                 (game/board-full? board) {:winner -1 :moves move-list :board new-board}
+                 (game/game-ended? new-board turn (list (game/column-top new-board move) move)) {:winner turn :moves new-move-list :board new-board}
+                 (game/board-full? board) {:winner -1 :moves new-move-list :board new-board}
                  :else (do
                         (when print-mode
                               (display-board new-board)
                               (println "player" (+ next-turn 1) "move"))
-                        (connect4-game player-1 player-2 print-mode next-turn new-board (conj move-list move)))))))
+                        (connect4-game player-1 player-2 print-mode next-turn new-board new-move-list))))))
 
-;(prn (connect4-game human-move #(ai/connect4-AI-move %1 %2 %3 2) true))
-(prn (connect4-game #(ai/connect4-AI-move %1 %2 %3 6) #(ai/connect4-AI-move %1 %2 %3 6) true))
-
-;(prn (/ (count (for [i (range 100) :when (= (get (connect4-game ai/random-move #(ai/connect4-AI-move %1 %2 %3 2)) :winner) 1)] i)) 100.0))
+;========= RUN =========
+;(prn (connect4-game human-move #(ai/connect4-AI-move %1 %2 %3 3) true))
+;(prn (connect4-game #(ai/connect4-AI-move %1 %2 %3 3) #(ai/connect4-AI-move %1 %2 %3 3) true))
+;(prn (/ (count (for [i (range 100) :when (= (get (connect4-game ai/random-move #(ai/connect4-AI-move %1 %2 %3 4) false) :winner) 1)] i)) 100.0))
 ;(prn (/ (count (for [i (range 100) :when (= (get (connect4-game #(ai/connect4-AI-move %1 %2 %3 2)
 ;                                                                #(ai/connect4-AI-move %1 %2 %3 2) false) :winner) 1)] i)) 100.0))
