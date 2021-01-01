@@ -5,6 +5,7 @@ To run the program:
 
 To generate an executable .jar file
   >lein compile
+  
   >lein uberjar
 
 To execute the .jar file
